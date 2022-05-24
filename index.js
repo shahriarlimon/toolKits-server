@@ -23,6 +23,8 @@ async function run() {
     const toolCollection = client.db("tool_kits").collection("tools");
     const orderCollection = client.db("tool_kits").collection("orders");
     const paymentCollection = client.db("tool_kits").collection("payments");
+    const reviewCollection = client.db("tool_kits").collection("reviews");
+    const userCollection = client.db("tool_kits").collection("users");
     app.get("/get-tools", async (req, res) => {
       const tools = await toolCollection.find().toArray({});
       res.send(tools);
@@ -44,12 +46,38 @@ async function run() {
       const filter = {email:email};
       const orders = await orderCollection.find(filter).toArray()
       res.send(orders)
-    })
-    app.post("/login", async (req, res) => {
-      const user = req.body;
-      const token = jwt.sign(user, process.env.access_secrete_token);
-      res.send({ token: token });
     });
+     
+    app.get('/user', async (req, res) => {
+      const users = await userCollection.find().toArray();
+      res.send(users);
+    });
+
+    app.put('/user/:email', async (req, res) => {
+      const email = req.params.email;
+      const user = req.body;
+      const filter = { email: email };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: user,
+      };
+      const result = await userCollection.updateOne(filter, updateDoc, options);
+      const token = jwt.sign({ email: email }, process.env.access_secrete_token, { expiresIn: '1h' })
+      res.send({ result, token });
+    });
+    app.put('/user/admin/:email', verifyJWT,  async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const updateDoc = {
+        $set: { role: 'admin' },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
+
+
+
+   
     app.post("/create-order",verifyJWT, async (req, res) => {
       const order = req.body
         const result = await orderCollection.insertOne(order);
@@ -59,6 +87,11 @@ async function run() {
         });
   
     });
+    app.post('/create-review', async(req,res)=>{
+      const review = req.body;
+      const result = await reviewCollection.insertOne(review);
+      res.send({status:true,message:'Your review has been added'});
+    })
     app.delete('/delete-order/:id', async(req,res)=>{
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
