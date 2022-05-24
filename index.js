@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 app.use(cors());
 app.use(express.json());
@@ -21,6 +22,7 @@ async function run() {
     await client.connect();
     const toolCollection = client.db("tool_kits").collection("tools");
     const orderCollection = client.db("tool_kits").collection("orders");
+    const paymentCollection = client.db("tool_kits").collection("payments");
     app.get("/get-tools", async (req, res) => {
       const tools = await toolCollection.find().toArray({});
       res.send(tools);
@@ -31,42 +33,82 @@ async function run() {
       const tool = await toolCollection.findOne(filter);
       res.send(tool);
     });
+    app.get("/get-order/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const tool = await orderCollection.findOne(filter);
+      res.send(tool);
+    });
+    app.get('/get-orders/:email', async(req,res)=>{
+      const email = req.params.email;
+      const filter = {email:email};
+      const orders = await orderCollection.find(filter).toArray()
+      res.send(orders)
+    })
     app.post("/login", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.access_secrete_token);
       res.send({ token: token });
     });
-    app.post("/create-order", async (req, res) => {
-      const order = req.body;
-      const tokenInfo = req.headers.authorization;
-      const [email, access_token] = tokenInfo.split(" ");
-      const decoded = verifyToken(access_token);
-      if (decoded.email === email) {
+    app.post("/create-order",verifyJWT, async (req, res) => {
+      const order = req.body
         const result = await orderCollection.insertOne(order);
         res.send({
           status: true,
           message: " Congrats! Your order has been placed",
         });
-      } else {
-        res.send({ status:false, message: "Unauthorized access" });
-      }
+  
     });
+    app.delete('/delete-order/:id', async(req,res)=>{
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await orderCollection.deleteOne(query);
+      res.send({success:true,message:'Successfully cancelled your order'})
+    });
+    app.post('/create-payment-intent', verifyJWT, async(req, res) =>{
+      const order = req.body;
+      const price = order.price;
+      const amount = price;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount : amount,
+        currency: 'usd',
+        payment_method_types:['card']
+      });
+      res.send({clientSecret: paymentIntent.client_secret})
+    });
+    app.patch('/get-order/:id',  async(req, res) =>{
+      const id  = req.params.id;
+      const payment = req.body;
+      const filter = {_id: ObjectId(id)};
+      const updatedDoc = {
+        $set: {
+          paid: true,
+          transactionId: payment.transactionId
+        }
+      }
+
+      const result = await paymentCollection.insertOne(payment);
+      const updatedOrder = await orderCollection.updateOne(filter, updatedDoc);
+      res.send(updatedOrder);
+    })
   } finally {
   }
 }
 run().catch(console.dir);
 
-function verifyToken(token) {
-  let email;
+function verifyJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: 'UnAuthorized access' });
+  }
+  const token = authHeader.split(' ')[1];
   jwt.verify(token, process.env.access_secrete_token, function (err, decoded) {
     if (err) {
-      email = "Invalid email";
+      return res.status(403).send({ message: 'Forbidden access' })
     }
-    if (decoded) {
-      email = decoded;
-    }
+    req.decoded = decoded;
+    next();
   });
-  return email;
 }
 app.get("/", async (req, res) => {
   res.send("tool kits is running");
