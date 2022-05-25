@@ -25,6 +25,27 @@ async function run() {
     const paymentCollection = client.db("tool_kits").collection("payments");
     const reviewCollection = client.db("tool_kits").collection("reviews");
     const userCollection = client.db("tool_kits").collection("users");
+    const profileCollection = client.db("tool_kits").collection("profiles");
+
+    const verifyAdmin = async (req, res, next) => {
+      const requester = req.decoded.email;
+      const requesterAccount = await userCollection.findOne({ email: requester });
+      if (requesterAccount.role === 'admin') {
+        next();
+      }
+      else {
+        res.status(403).send({ message: 'forbidden' });
+      }
+    };
+    app.post('/add-tool', async(req,res)=>{
+      const tool = req.body;
+      const result = await toolCollection.insertOne(tool);
+      res.send({
+        status: true,
+        message: " Congrats! Your successfully added the tool",
+      });
+
+    })
     app.get("/get-tools", async (req, res) => {
       const tools = await toolCollection.find().toArray({});
       res.send(tools);
@@ -65,6 +86,12 @@ async function run() {
       const token = jwt.sign({ email: email }, process.env.access_secrete_token, { expiresIn: '1h' })
       res.send({ result, token });
     });
+    app.get('/admin/:email', async (req, res) => {
+      const email = req.params.email;
+      const user = await userCollection.findOne({ email: email });
+      const isAdmin = user.role === 'admin';
+      res.send({ admin: isAdmin })
+    })
     app.put('/user/admin/:email', verifyJWT,  async (req, res) => {
       const email = req.params.email;
       const filter = { email: email };
