@@ -37,32 +37,38 @@ async function run() {
         res.status(403).send({ message: 'forbidden' });
       }
     };
-    app.post('/add-tool', async(req,res)=>{
+   
+    app.post('/add-tool',verifyJWT,verifyAdmin, async(req,res)=>{
       const tool = req.body;
       const result = await toolCollection.insertOne(tool);
       res.send({
         status: true,
-        message: " Congrats! Your successfully added the tool",
+        message: " Congrats! You successfully added the tool",
       });
 
-    })
+    });
+   
     app.get("/get-tools", async (req, res) => {
-      const tools = await toolCollection.find().toArray({});
+      const tools = await toolCollection.find().toArray();
       res.send(tools);
     });
+    app.get('/get-reviews', async(req,res)=>{
+      const reviews = await reviewCollection.find().toArray();
+      res.send(reviews);
+    })
     app.get("/get-tool/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
       const tool = await toolCollection.findOne(filter);
       res.send(tool);
     });
-    app.get("/get-order/:id", async (req, res) => {
+    app.get("/get-order/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
       const tool = await orderCollection.findOne(filter);
       res.send(tool);
     });
-    app.get('/get-orders/:email', async(req,res)=>{
+    app.get('/get-orders/:email',verifyJWT, async(req,res)=>{
       const email = req.params.email;
       const filter = {email:email};
       const orders = await orderCollection.find(filter).toArray()
@@ -86,13 +92,13 @@ async function run() {
       const token = jwt.sign({ email: email }, process.env.access_secrete_token, { expiresIn: '1h' })
       res.send({ result, token });
     });
-    app.get('/admin/:email', async (req, res) => {
+    app.get('/admin/:email',verifyJWT,verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const user = await userCollection.findOne({ email: email });
       const isAdmin = user.role === 'admin';
       res.send({ admin: isAdmin })
     })
-    app.put('/user/admin/:email', verifyJWT,  async (req, res) => {
+    app.put('/user/admin/:email', verifyJWT,verifyAdmin,  async (req, res) => {
       const email = req.params.email;
       const filter = { email: email };
       const updateDoc = {
@@ -114,7 +120,7 @@ async function run() {
         });
   
     });
-    app.post('/create-review', async(req,res)=>{
+    app.post('/create-review', verifyJWT, async(req,res)=>{
       const review = req.body;
       const result = await reviewCollection.insertOne(review);
       res.send({status:true,message:'Your review has been added'});
@@ -136,7 +142,7 @@ async function run() {
       });
       res.send({clientSecret: paymentIntent.client_secret})
     });
-    app.patch('/get-order/:id',  async(req, res) =>{
+    app.patch('/get-order/:id',verifyJWT,  async(req, res) =>{
       const id  = req.params.id;
       const payment = req.body;
       const filter = {_id: ObjectId(id)};
@@ -150,6 +156,16 @@ async function run() {
       const result = await paymentCollection.insertOne(payment);
       const updatedOrder = await orderCollection.updateOne(filter, updatedDoc);
       res.send(updatedOrder);
+    });
+    app.post('/create-profile',verifyJWT, async(req,res)=>{
+      const email = req.params.email
+      const profile = req.body;
+      const result = await profileCollection.insertOne(profile);
+      res.send({
+        status: true,
+        message: " Congrats! Your have successfully updated your profile",
+      }); 
+
     })
   } finally {
   }
