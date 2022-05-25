@@ -56,12 +56,18 @@ async function run() {
       const reviews = await reviewCollection.find().toArray();
       res.send(reviews);
     })
-    app.get("/get-tool/:id", async (req, res) => {
+    app.get("/get-tool/:id",  async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
       const tool = await toolCollection.findOne(filter);
       res.send(tool);
     });
+    app.delete('/delete-tool/:id', verifyJWT, verifyAdmin,async(req,res)=>{
+      const id = req.params.id;
+      const filter = {_id:ObjectId(id)};
+      const result = await toolCollection.deleteOne(filter);
+      res.send(result)
+    })
     app.get("/get-order/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
