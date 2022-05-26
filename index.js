@@ -147,7 +147,7 @@ async function run() {
       const result = await orderCollection.deleteOne(query);
       res.send(result);
     });
-    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+    app.post("/create-payment-intent",  async (req, res) => {
       const order = req.body;
       const price = order.price;
       const amount = price;
