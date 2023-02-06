@@ -64,7 +64,7 @@ async function run() {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
       const tool = await toolCollection.findOne(filter);
-      res.send(tool);
+      res.send(tool); 
     });
     app.delete("/delete-tool/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
