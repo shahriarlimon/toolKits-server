@@ -5,7 +5,13 @@ const cloudinary = require("../utils/cloudinary");
 const { sendToken } = require("../utils/sendToken");
 
 exports.login = catchAsyncErrors(async (req, res, next) => {
-
+    const { email, password } = req.body;
+    if (!email || !password) return next(new ErrorHandler("please enter email/password", 400));
+    const user = await User.findOne({ email })
+    if (!user) return next(new ErrorHandler("Invalid email/password", 401))
+    const isPasswordMatched = await user.comparePassword(password)
+    if (!isPasswordMatched) return next(new ErrorHandler("Invalid email/password", 401))
+    sendToken(user, 201, res)
 })
 
 exports.register = catchAsyncErrors(async (req, res, next) => {
@@ -24,4 +30,15 @@ exports.register = catchAsyncErrors(async (req, res, next) => {
         } */
     })
     sendToken(newUser, 201, res)
+})
+
+exports.logout = catchAsyncErrors(async (req, res, next) => {
+    res.cookie("token", null, {
+        expires: new Date(Date.now()),
+        httpOnly: true
+    })
+    res.status(201).json({
+        success: true,
+        message: "Logged out"
+    })
 })
